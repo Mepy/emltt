@@ -13,3 +13,8 @@ let plus : nat -> nat -> nat =
         else \ n . n
 let one = succ zero
 let plus_one = plus one
+
+let unit_unique : U 0 = Pi(x:Unit) Id(Unit, x, unit)
+let unit_unique_proof : unit_unique =
+    \ x . singleton x at y.Id(Unit, y, unit) with
+    | unit => refl unit

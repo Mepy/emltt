@@ -19,6 +19,7 @@ type expr =
 
   | Unit    (* True,  \{ * \} *)
   | Trivial (* () : Unit *)
+  | Singleton of expr * (* BINDS *) expr *  expr  (* Singleton(e, x.A, a:A[*/x])*)
 
   (* 
     | Sum of expr * expr (* A + B *)
@@ -48,7 +49,8 @@ type expr =
     (* tree(a, b.subtree)
       a : A, b:B(a).subtree : W(x:A)B(x)   
     *)
-  | Ind of expr * (* BINDS *) expr * (* BINDS 3 *)expr (* Ind(tree, t.C, a.s.h.c) *)
+  | Ind of expr * (* BINDS *) expr * (* BINDS 3 *) expr 
+    (* Ind(tree, t.C, a.s.h.c) *)
   (* induct term at t:W -> C with
      a:A s:B(a)->W h:Pi(b:B(a))C(s(b)) -> c : C[t|->tree(a, s)] 
   *)

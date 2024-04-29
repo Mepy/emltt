@@ -35,7 +35,7 @@ let plus_type = S.Pi(nat, S.Pi(nat, nat))
 let plus = S.Lam((* m:Nat *)S.Lam((* n:Nat *) S.Ind(S.Var 1 (* m *), (* t. *) nat,  
   (* a s h.*) S.If(S.Var 2(* a *), 
     (* a==True, succ, 应该调转一下顺序的 *)
-    S.App(S.Var 0 (* h *), S.Trivial)
+    S.App(succ, S.App(S.Var 0 (* h *), S.Trivial))
     (* S.App(succ, S.App(S.Var 0 (* h *), S.Trivial)) *),
     (* a==False, zero *)
     S.Var 3 (* n *),
@@ -43,6 +43,7 @@ let plus = S.Lam((* m:Nat *)S.Lam((* n:Nat *) S.Ind(S.Var 1 (* m *), (* t. *) na
   )  
 )))
 
+(* 
 let nat_nat = S.Pi(nat, nat)
 let plus = S.Lam((* m:Nat *) S.Ind(S.Var 0 (* m *), (* t. *) nat_nat,  
 (* a s h.*) S.If(S.Var 2(* a *), 
@@ -54,6 +55,7 @@ let plus = S.Lam((* m:Nat *) S.Ind(S.Var 0 (* m *), (* t. *) nat_nat,
   nat
 )  
 ))
+*)
 
 let two = S.App(S.App(plus, one_nf), one_nf)
 
@@ -70,13 +72,11 @@ let nat_nat = S.Pi(nat, nat)
 let vv = eval [] plus_one
 let tt = eval [] nat_nat
 
-(* 
 let two = normalize [] (S.App(succ, S.App(succ, zero))) nat
 let plus_two = S.App(plus, two)
 let nat_nat = S.Pi(nat, nat)
 let vv = eval [] plus_two
 let tt = eval [] nat_nat
-*)
 
 (* 
 let size = 0 
@@ -91,3 +91,9 @@ let b_typ = eval_clos b_typ_clos a
 let b = mk_var b_typ size
 let normal = Normal {typ=W(a_typ, b_typ_clos); value=eval_clos s b}
 *)
+
+let unit_unique = let open S in Pi(Unit, Id(Type 0, Var 0, Trivial))
+let unit_unique_proof = let open S in Lam(Singleton(Var 0, Id(Unit, Var 0, Trivial), 
+  Refl(Trivial)
+))
+let test = normalize [] unit_unique_proof unit_unique = unit_unique_proof

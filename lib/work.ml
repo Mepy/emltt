@@ -36,9 +36,10 @@ and neutral =
   | Fst of neutral
   | Snd of neutral
   | Exfalso of neutral * value
+  | Singleton of neutral * clos * value
   | If of neutral * value * value * value
   | J of neutral * clos3 * clos * value * value * value
-  | Ind of neutral * clos * clos3
+  | Ind of neutral * value * clos * clos * clos3 
 and normal = | Normal of {typ:value; value:value}
 [@@deriving show]
 
@@ -66,6 +67,7 @@ let rec eval (env:env) (expr:S.expr) : value =
   | S.Exfalso (falsehood, typ) -> eval_exfalso (eval env falsehood) (eval env typ)
   | S.Unit -> Unit
   | S.Trivial -> Trivial
+  | S.Singleton(e, a_typ, a) -> eval_singleton (eval env e) (Clos{expr=a_typ; env}) (eval env a)
   | S.Bool -> Bool
   | S.True -> True
   | S.False -> False
@@ -78,7 +80,7 @@ let rec eval (env:env) (expr:S.expr) : value =
   | S.W(a, b) -> W(eval env a, Clos {expr=b; env})
   | S.Tree(a, s) -> Tree(eval env a, Clos {expr=s; env})
   | S.Ind(t, c_typ, c) -> eval_ind env t c_typ c
-  | _ -> failwith "todo singleton induction"
+  
 
 and eval_app (func:value) (arg:value) =
   match func with
@@ -118,11 +120,18 @@ and eval_snd (pair:value) : value =
     let snd_typ = eval_clos snd_typ_clos fst in
     Neutral {typ=snd_typ; term=Snd neutral}
   | _ -> failwith "snd not_a_pair"
-and eval_exfalso (falsehood:value) (typ:value) =
+and eval_exfalso (falsehood:value) (typ:value) : value =
   match falsehood with
   | Neutral {typ=Void; term=neutral} ->
     Neutral {typ; term=Exfalso(neutral, typ)}
   | _ -> failwith ("exfalso " ^ (show_value falsehood) ^ " not_a_void")
+and eval_singleton (e:value) (a_typ:clos) (a:value) : value = 
+  match e with
+  | Trivial -> failwith "todo"
+  | Neutral {typ=Unit; term=neutral} -> 
+    let typ = eval_clos a_typ a in
+    Neutral {typ; term=Singleton(neutral, a_typ, a) }
+  | _ -> failwith ("singleton " ^ (show_value a) ^ " not_a_unit")
 and eval_if (env:env) (bb:S.expr) (tt:S.expr) (ff:S.expr) (typ:S.expr) : value =
   match eval env bb with
   | True -> eval env tt
@@ -144,11 +153,7 @@ and eval_j (mot:clos3) (refl:clos) (path:value) : value =
 and eval_ind (env:env) (t:S.expr) (c_typ:S.expr) (c:S.expr) : value =
   match eval env t with
   | Tree(a, s) -> 
-    (* todo: env from s ??? check it! *)
     let Clos{expr=s_expr; env=s_env} = s in
-    
-    print_endline ("S_ENV : " ^ show_env s_env);
-    print_endline ("H_ENV : " ^ show_env env);
     
     (* h = \ b. ind (s b) -> C with c *)
     (* (* old one *)
@@ -157,7 +162,36 @@ and eval_ind (env:env) (t:S.expr) (c_typ:S.expr) (c:S.expr) : value =
       S.Ind((* b. *) s_expr, c_typ, c)})
     ) in 
     *)
-    let h = eval env (S.Lam (S.Ind(s_expr, c_typ, c))) in
+    let rec shift (expr:S.expr) : S.expr =
+      let open S in
+      match expr with
+      | Var i -> if i < 3 then Var i else Var (i+1)
+      | Type universe -> Type universe
+      | Let (e1, e2) -> Let(shift e1, shift e2)
+      | Pi (e1, e2) -> Pi(shift e1, shift e2)
+      | Lam e -> Lam (shift e)
+      | App (e1, e2) -> App(shift e1, shift e2)
+      | Sigma (e1, e2) -> Sigma(shift e1, shift e2)
+      | Pair (e1, e2) -> Pair (shift e1, shift e2)
+      | Fst e -> Fst (shift e)
+      | Snd e -> Snd (shift e)
+      | Void -> Void
+      | Exfalso (e1, e2) -> Exfalso (shift e1, shift e2)
+      | Unit -> Unit
+      | Trivial -> Trivial
+      | Singleton (e1, e2, e3) -> Singleton (shift e1, shift e2, shift e3)
+      | Bool -> Bool
+      | True -> True
+      | False -> False
+      | If (e1, e2, e3, e4) -> If (shift e1, shift e2, shift e3, shift e4)
+      | Id (e1, e2, e3) -> Id (shift e1, shift e2, shift e3)
+      | Refl e -> Refl (shift e)
+      | J (e1, e2, e3) -> J (shift e1, shift e2, shift e3)
+      | W (e1, e2) -> W (shift e1, shift e2)
+      | Tree (e1, e2) -> Tree (shift e1, shift e2)
+      | Ind (e1, e2, e3) -> Ind (shift e1, shift e2, shift e3)
+    in 
+    let h = eval env (S.Lam (S.Ind(s_expr, shift c_typ, shift c))) in
     eval_clos3 (Clos3{expr=c; env}) a (Lam s) h
   | Neutral {typ; term} -> (
     match typ with
@@ -166,7 +200,7 @@ and eval_ind (env:env) (t:S.expr) (c_typ:S.expr) (c:S.expr) : value =
       let c= Clos3{expr=c; env} in 
       Neutral 
       { typ = eval_clos c_typ typ
-      ; term=Ind(term, c_typ, c) }
+      ; term=Ind(term, a, b, c_typ, c) }
     | _ -> failwith "ind not_a_W_type"
   )
   | _ -> failwith "ind not_a_tree"
@@ -187,6 +221,7 @@ let rec quote (size:int) (Normal{typ; value}:normal): S.expr =
   | Unit, Trivial -> S.Trivial
   | Bool, True -> S.True
   | Bool, False -> S.False
+  | Id(a_typ, _, _), Refl(a) -> S.Refl(quote size (Normal{typ=a_typ; value=a}))
   | W(a_typ, b_typ_clos), Tree(a, s) ->
     let b_typ = eval_clos b_typ_clos a in
     let b = mk_var b_typ size in
@@ -227,6 +262,11 @@ and quote_ne (size:int) (neutral:neutral) : S.expr =
   | Fst(neutral) -> S.Fst(quote_ne size neutral)
   | Snd(neutral) -> S.Snd(quote_ne size neutral)
   | Exfalso(neutral, typ) -> S.Exfalso(quote_ne size neutral, quote_typ size typ)
+  | Singleton(neutral, a_typ, a) -> 
+    let var = mk_var Unit size in 
+    let a_typ' = quote_typ (size+1) (eval_clos a_typ var) in
+    let a' = quote size (Normal{typ=eval_clos a_typ Trivial; value=a}) in
+    S.Singleton(quote_ne size neutral, a_typ', a')
   | If(bb, tt, ff, typ) -> 
     S.If(quote_ne size bb, 
     quote size (Normal{typ; value=tt}), 
@@ -244,6 +284,17 @@ and quote_ne (size:int) (neutral:neutral) : S.expr =
       (Normal { typ=eval_clos3 mot refl_var refl_var (Refl refl_var)
               ; value=eval_clos refl refl_var}) in
     S.J (path', mot', refl')
+  | Ind(neutral, a_typ, b_typ_clos, c_typ_clos, c) -> 
+    let w_typ = W(a_typ, b_typ_clos) in
+    let tree = mk_var w_typ size in
+    let c_typ = (eval_clos c_typ_clos tree) in
+    let c_typ' = quote_typ (size+1) c_typ in
+
+    let a = mk_var a_typ size in
+    let b_typ = (eval_clos b_typ_clos a) in
+    (* 这里的类型好复杂, 或许要写入 syntax *)
+    let c' = failwith "todo" in
+    S.Ind(quote_ne size neutral, c_typ', c')
   | _ -> failwith "todo"
 
 let rec initial_env (env:S.typ list) : env * int =
