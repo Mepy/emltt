@@ -1,0 +1,15 @@
+let nat : U 0 = W (x:Bool) if x then Unit else Void
+let zero : nat = tree(false, \ x . exfalso x nat)
+let succ : nat -> nat = \ n . tree(true, \ _ . n)
+let plus : nat -> nat -> nat = 
+    \ m . \ n . induct m at nat with
+    | tree(a, s, h) => if a 
+        then succ (h unit)
+        else n
+let plus : nat -> nat -> nat =
+    \ m . induct m at nat -> nat with
+    | tree(a, s, h) => if a 
+        then \ n . succ (h unit n)
+        else \ n . n
+let one = succ zero
+let plus_one = plus one
