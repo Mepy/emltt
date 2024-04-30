@@ -18,3 +18,8 @@ let unit_unique : U 0 = Pi(x:Unit) Id(Unit, x, unit)
 let unit_unique_proof : unit_unique =
     \ x . singleton x at y.Id(Unit, y, unit) with
     | unit => refl unit
+
+let x : (A:U) -> (B:(a:A)->U 0) -> (C:(t:W(x:A)B(x))->U 0)
+    -> (a:A) -> (s:B(a)->W(x:A)B(x)) -> (h:(b:B(a)->C(s(b))))
+    -> C(Tree(a, s))
+    = \ A . \ B . \ C . \ a . \ s . \ h . c

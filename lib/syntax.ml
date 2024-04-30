@@ -38,7 +38,7 @@ type expr =
 
   | Id of expr * expr * expr (* Id(A, a, a') *)
   | Refl of expr (* Refl(a) : a=a *)
-  | J of expr * (* BINDS 3 *) expr * (* BINDS *) expr (* J(path:a=a', a.a'.A.t, refl) *)
+  | J of expr * (* BINDS 3 *) expr * (* BINDS *) expr (* J(path:a=a', a.a'.A.t, x.refl) *)
 
   (* TODO: W types *)
   (* | W of string * expr * expr 

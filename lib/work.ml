@@ -230,9 +230,9 @@ let rec quote (size:int) (Normal{typ; value}:normal): S.expr =
     let snd = eval_snd pair in
     S.Pair ( quote size (Normal{typ=fst_typ; value=fst})
            , quote size (Normal{typ=snd_typ; value=snd}) )
-  | Unit, Trivial -> S.Trivial
-  | Bool, True -> S.True
-  | Bool, False -> S.False
+  | _, Trivial -> S.Trivial
+  | _, True -> S.True
+  | _, False -> S.False
   | Id(a_typ, _, _), Refl(a) -> S.Refl(quote size (Normal{typ=a_typ; value=a}))
   | W(a_typ, b_typ_clos), Tree(a, s) ->
     let b_typ = eval_clos b_typ_clos a in
@@ -304,8 +304,41 @@ and quote_ne (size:int) (neutral:neutral) : S.expr =
 
     let a = mk_var a_typ size in
     let b_typ = (eval_clos b_typ_clos a) in
+    let w_typ' = quote_typ size w_typ in
+    let s_typ = Pi(b_typ, Clos{env=[]; expr=w_typ'}) in
+    let s = mk_var s_typ (size+1) in
+    let h_typ = Pi(b_typ, Clos{env=s::a::[] (* todo *)
+        ; expr=quote_typ (size+2)
+        (eval_clos c_typ_clos (Neutral{typ=w_typ;
+        term=App((* s *) Level (size+1), 
+          Normal{typ=b_typ;value=Neutral{typ=b_typ;
+            term=Level 0 (* todo : level ?0 *)}})
+          })
+        )
+    }) in
+    
+  
+
+    let c_t_a_s = (
+      let s' = S.Lam(S.App(S.Level(size+1), S.Index 0)) in
+      let Clos{env; expr} = c_typ_clos in
+      let env' = Tree(a, Clos{env=a::env; expr=s'})::s::a::env in
+      eval env' expr
+    ) in
+    
+   (* let env' = s::a::env in
+    let vv = eval (Tree(a, Clos{env=a::env (* todo *); expr=s'})::env') expr in
+    let c_typ' = quote_typ (size+2) vv in
+    print_endline (S.show_expr c_typ'); *)
+    let h = mk_var h_typ (size+2) in
     (* 这里的类型好复杂, 或许要写入 syntax *)
-    let c' = failwith "todo" in
+    (* print_endline (show_value (eval_clos3 c a s h)); *)
+    print_endline (show_value (eval_clos3 c a s h));
+    let c' = quote (size+3) 
+      (Normal{typ=c_t_a_s; 
+        value=(eval_clos3 c a s h)})
+    in
+    
     S.Ind(quote_ne size neutral, c_typ', c')
   | _ -> failwith "todo"
 

@@ -96,3 +96,66 @@ let unit_unique_proof = let open S in Lam(Singleton(Index 0, Id(Unit, Index 0, T
   Refl(Trivial)
 ))
 let test = normalize [] unit_unique_proof unit_unique = unit_unique_proof
+
+
+let nat_nat_nat = S.Pi(nat, S.Pi(nat, nat))
+let vv = eval [] plus
+let tt = eval [] nat_nat_nat
+let plus_nf = qt 0 vv tt
+
+(*
+let size = 0 
+let Pi(src, dst), func = tt, vv
+let arg = mk_var src size
+let typ, value =eval_clos dst arg, eval_app func arg
+let size = 1
+let Pi(src, dst), func = typ, value
+let arg = mk_var src size
+let typ, value =eval_clos dst arg, eval_app func arg
+let size = 2
+(* typ, value = _, plus_body *)
+let Neutral {term=Ind(neutral, a_typ, b_typ_clos, c_typ_clos, c); _} = value
+let w_typ = W(a_typ, b_typ_clos)
+let tree = mk_var w_typ size
+let c_typ = (eval_clos c_typ_clos tree)
+let c_typ' = quote_typ (size+1) c_typ
+
+let a = mk_var a_typ size
+let b_typ = (eval_clos b_typ_clos a)
+let w_typ' = quote_typ size w_typ
+let s_typ = Pi(b_typ, Clos{env=[]; expr=w_typ'})
+let s = mk_var s_typ (size+1)
+let h_typ = Pi(b_typ, Clos{env=[s;a] (* todo *)
+    ; expr=quote_typ (size+2)
+    (eval_clos c_typ_clos (Neutral{typ=w_typ;
+    term=App((* s *) Level (size+1), 
+      Normal{typ=b_typ;value=Neutral{typ=b_typ;
+        term=Level 0 (* todo : level ?0 *)}})
+      })
+    )
+})
+let c_t_a_s = (
+  let s' = S.Lam(S.App(S.Level(size+1), S.Index 0)) in
+  let Clos{env; expr} = c_typ_clos in
+  let env' = Tree(a, Clos{env=a::env; expr=s'})::s::a::env in
+  eval env' expr
+)
+let h = mk_var h_typ (size+2)
+let tt, vv = c_t_a_s, (eval_clos3 c a s h) (* vv is neutral *)
+let size = 5
+let Neutral{term=If(bb, typ_clos, tt, ff)} = vv
+let var = mk_var Bool size
+let typ' = quote_typ (size+1) (eval_clos typ_clos var) 
+(* quote size (Normal{typ=eval_clos typ_clos True; value=tt}) *)
+let W(a_typ, b_typ_clos), Tree(a, s) = eval_clos typ_clos True, tt
+let b_typ = eval_clos b_typ_clos a
+let b = mk_var b_typ size
+let typ, value =W(a_typ, b_typ_clos), eval_clos s b (* neutral *)
+let size = 6
+let Neutral {term} = value
+
+let App(_, arg) = term
+let Normal{typ; value} = arg
+
+(* qt size value typ *)
+*)
