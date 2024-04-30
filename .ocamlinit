@@ -12,7 +12,7 @@ let v_typ = eval [] typ
 
 
 
-let expr2 = S.Lam (S.Exfalso (S.Var 0, S.Void))
+let expr2 = S.Lam (S.Exfalso (S.Index 0, S.Void))
 let typ2 = S.Pi (S.Void, S.Void)
 let value = eval [] expr2
 let v_typ = eval [] typ2;;
@@ -25,34 +25,33 @@ let true_neq_false_typ = S.Pi (S.Id(S.Bool, S.true, S.false), S.Void)
 let true_neq_false_expr = 
   *)
 
-let nat = S.W(S.Bool, S.If(S.Var 0, S.Unit, S.Void, S.Type 0))
-let zero = S.Tree(S.False, (* fhd:Void. *) S.Exfalso(S.Var 0(* fhd *), nat))
-let succ = S.Lam((* n:Nat .*) S.Tree(S.True, (* ():Unit. *) S.Var 1(* n *)))
+let nat = S.W(S.Bool, S.If(S.Index 0, S.Type 0, S.Unit, S.Void))
+let zero = S.Tree(S.False, (* fhd:Void. *) S.Exfalso(S.Index 0(* fhd *), nat))
+let succ = S.Lam((* n:Nat .*) S.Tree(S.True, (* ():Unit. *) S.Index 1(* n *)))
 let one = S.App(succ, zero)
 let one_nf = normalize [] one nat
 
 let plus_type = S.Pi(nat, S.Pi(nat, nat))
-let plus = S.Lam((* m:Nat *)S.Lam((* n:Nat *) S.Ind(S.Var 1 (* m *), (* t. *) nat,  
-  (* a s h.*) S.If(S.Var 2(* a *), 
+let plus = S.Lam((* m:Nat *)S.Lam((* n:Nat *) S.Ind(S.Index 1 (* m *), (* t. *) nat,  
+  (* a s h.*) S.If(S.Index 2(* a *),  nat,
     (* a==True, succ, 应该调转一下顺序的 *)
-    S.App(succ, S.App(S.Var 0 (* h *), S.Trivial))
-    (* S.App(succ, S.App(S.Var 0 (* h *), S.Trivial)) *),
+    S.App(succ, S.App(S.Index 0 (* h *), S.Trivial)),
+    (* S.App(succ, S.App(S.Index 0 (* h *), S.Trivial)) *)
     (* a==False, zero *)
-    S.Var 3 (* n *),
-    nat
+    S.Index 3 (* n *)
+    
   )  
 )))
 
 (* 
 let nat_nat = S.Pi(nat, nat)
-let plus = S.Lam((* m:Nat *) S.Ind(S.Var 0 (* m *), (* t. *) nat_nat,  
-(* a s h.*) S.If(S.Var 2(* a *), 
+let plus = S.Lam((* m:Nat *) S.Ind(S.Index 0 (* m *), (* t. *) nat_nat,  
+(* a s h.*) S.If(S.Index 2(* a *), nat,
   (* a==True, succ, 应该调转一下顺序的 *)
-  S.Lam(S.App(succ, S.App(S.App(S.Var 1 (* h *), S.Trivial), S.Var 0)))
-  (* S.App(succ, S.App(S.Var 0 (* h *), S.Trivial)) *),
+  S.Lam(S.App(succ, S.App(S.App(S.Index 1 (* h *), S.Trivial), S.Index 0))),
+  (* S.App(succ, S.App(S.Index 0 (* h *), S.Trivial)) *)
   (* a==False, zero *)
-  S.Lam(S.Var 0)(* \ n. n *),
-  nat
+  S.Lam(S.Index 0)(* \ n. n *)
 )  
 ))
 *)
@@ -92,8 +91,8 @@ let b = mk_var b_typ size
 let normal = Normal {typ=W(a_typ, b_typ_clos); value=eval_clos s b}
 *)
 
-let unit_unique = let open S in Pi(Unit, Id(Type 0, Var 0, Trivial))
-let unit_unique_proof = let open S in Lam(Singleton(Var 0, Id(Unit, Var 0, Trivial), 
+let unit_unique = let open S in Pi(Unit, Id(Type 0, Index 0, Trivial))
+let unit_unique_proof = let open S in Lam(Singleton(Index 0, Id(Unit, Index 0, Trivial), 
   Refl(Trivial)
 ))
 let test = normalize [] unit_unique_proof unit_unique = unit_unique_proof

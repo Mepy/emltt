@@ -31,24 +31,25 @@ and value =
   | Tree of value * clos
 
 and neutral = 
-  | Var of int (* DeBruijn level *)
+  | Level of int (* DeBruijn level *)
   | App of neutral * normal
   | Fst of neutral
   | Snd of neutral
   | Exfalso of neutral * value
   | Singleton of neutral * clos * value
-  | If of neutral * value * value * value
+  | If of neutral * clos * value * value
   | J of neutral * clos3 * clos * value * value * value
   | Ind of neutral * value * clos * clos * clos3 
 and normal = | Normal of {typ:value; value:value}
 [@@deriving show]
 
-let mk_var typ level = Neutral {typ; term=Var level}
+let mk_var typ level = Neutral {typ; term=Level level}
 
 module S = Syntax
 let rec eval (env:env) (expr:S.expr) : value = 
   match expr with
-  | S.Var i -> List.nth env i
+  | S.Index i -> List.nth env i
+  | S.Level l -> List.nth env (List.length env -l-1)
   | S.Type universe -> Type universe
   | S.Let (def, body) -> 
     let env' = (eval env def) :: env in
@@ -71,8 +72,8 @@ let rec eval (env:env) (expr:S.expr) : value =
   | S.Bool -> Bool
   | S.True -> True
   | S.False -> False
-  | S.If(bb, tt, ff, typ) -> 
-    eval_if env bb tt ff typ
+  | S.If(bb, typ, tt, ff) -> 
+    eval_if env bb typ tt ff
   | S.Id (typ, left, right) -> Id (eval env typ, eval env left, eval env right) 
   | S.Refl expr -> Refl (eval env expr)
   | S.J (path, mot, refl) ->
@@ -132,12 +133,12 @@ and eval_singleton (e:value) (a_typ:clos) (a:value) : value =
     let typ = eval_clos a_typ a in
     Neutral {typ; term=Singleton(neutral, a_typ, a) }
   | _ -> failwith ("singleton " ^ (show_value a) ^ " not_a_unit")
-and eval_if (env:env) (bb:S.expr) (tt:S.expr) (ff:S.expr) (typ:S.expr) : value =
+and eval_if (env:env) (bb:S.expr) (typ: (* BINDS *) S.expr) (tt:S.expr) (ff:S.expr) : value =
   match eval env bb with
   | True -> eval env tt
   | False -> eval env ff
-  | Neutral {typ=Bool; term=neutral} -> 
-    Neutral {typ=eval env typ; term=If (neutral, eval env tt, eval env ff, eval env typ) }
+  | Neutral {typ=Bool; term=neutral} as bb -> 
+    Neutral {typ=eval (bb::env) typ; term=If (neutral, Clos{env; expr=typ}, eval env tt, eval env ff) }
   | _ -> failwith "if not_a_bool"
 and eval_j (mot:clos3) (refl:clos) (path:value) : value =
   match path with
@@ -162,10 +163,11 @@ and eval_ind (env:env) (t:S.expr) (c_typ:S.expr) (c:S.expr) : value =
       S.Ind((* b. *) s_expr, c_typ, c)})
     ) in 
     *)
+    (*
     let rec shift (expr:S.expr) : S.expr =
       let open S in
       match expr with
-      | Var i -> if i < 3 then Var i else Var (i+1)
+      | Index i -> if i < 3 then Index i else Index (i+1)
       | Type universe -> Type universe
       | Let (e1, e2) -> Let(shift e1, shift e2)
       | Pi (e1, e2) -> Pi(shift e1, shift e2)
@@ -192,6 +194,16 @@ and eval_ind (env:env) (t:S.expr) (c_typ:S.expr) (c:S.expr) : value =
       | Ind (e1, e2, e3) -> Ind (shift e1, shift e2, shift e3)
     in 
     let h = eval env (S.Lam (S.Ind(s_expr, shift c_typ, shift c))) in
+    *)
+    let h' = 
+      let size = List.length env in 
+      if size = 0 then (S.Lam (S.Ind(s_expr, c_typ, c))) 
+      else S.Lam (* due to this *) (S.Ind(s_expr, 
+        S.levelize size 1 c_typ, 
+        S.levelize size 3 c)
+      ) (* if exists closure variable, use level *)
+    in
+    let h = eval env h' in 
     eval_clos3 (Clos3{expr=c; env}) a (Lam s) h
   | Neutral {typ; term} -> (
     match typ with
@@ -229,7 +241,6 @@ let rec quote (size:int) (Normal{typ; value}:normal): S.expr =
     let s_expr = quote (size+1) normal in
     S.Tree(quote size (Normal{typ=a_typ; value=a}), s_expr)
   | _, Neutral {term=neutral; _} -> quote_ne size neutral
-  (* todo Singleton induction *)
   | _ -> 
     print_endline ((show_value value) ^ " : " ^(show_value typ));
     failwith "???unknown"
@@ -257,7 +268,7 @@ and quote_typ (size:int) (typ:value) : S.expr =
   | _ -> failwith "quote_typ not_a_type"
 and quote_ne (size:int) (neutral:neutral) : S.expr =
   match neutral with
-  | Var level -> S.Var (size-(level+1)) (* index = size-(level+1) *)
+  | Level level -> S.Index (size-(level+1)) (* index = size-(level+1) *)
   | App(neutral, arg) -> S.App (quote_ne size neutral, quote size arg)
   | Fst(neutral) -> S.Fst(quote_ne size neutral)
   | Snd(neutral) -> S.Snd(quote_ne size neutral)
@@ -267,11 +278,12 @@ and quote_ne (size:int) (neutral:neutral) : S.expr =
     let a_typ' = quote_typ (size+1) (eval_clos a_typ var) in
     let a' = quote size (Normal{typ=eval_clos a_typ Trivial; value=a}) in
     S.Singleton(quote_ne size neutral, a_typ', a')
-  | If(bb, tt, ff, typ) -> 
-    S.If(quote_ne size bb, 
-    quote size (Normal{typ; value=tt}), 
-    quote size (Normal{typ; value=ff}), 
-    quote_typ size typ)
+  | If(bb, typ_clos, tt, ff) -> 
+    let var = mk_var Bool size in
+    let typ' = quote_typ (size+1) (eval_clos typ_clos var) in 
+    S.If(quote_ne size bb, typ',
+    quote size (Normal{typ=eval_clos typ_clos True; value=tt}), 
+    quote size (Normal{typ=eval_clos typ_clos False; value=ff}))
   | J (path, mot, refl, typ, left, right) -> 
     let path' = quote_ne size path in
     let mot_var1 = mk_var typ size in
@@ -302,7 +314,7 @@ let rec initial_env (env:S.typ list) : env * int =
   | [] -> ([], 0)
   | typ::env ->
     let (env', level) = initial_env env in
-    let value = Neutral {typ=eval env' typ; term=Var level} in 
+    let value = Neutral {typ=eval env' typ; term=Level level} in 
     (value::env', level + 1)
 
 let normalize (env:S.typ list) (expr:S.expr) (typ:S.typ) : S.expr = 

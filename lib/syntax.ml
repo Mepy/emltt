@@ -1,8 +1,9 @@
 (* we do namelessly *)
 type expr =
-  | Var of int (* DeBruijn index *)
+  | Index of int (* DeBruijn index *)
+  | Level of int (* DeBruijn level, NOT use when construct AST *)
   | Type of int (* universe i *)
-  | Let of expr * expr (* let _0 = expr in expr *)
+  | Let of expr * (* BINDS *) expr (* let _0 = expr in expr *)
 
   | Pi of expr * (* BINDS *) expr (* Pi T x.A *)
   | Lam of (* BINDS *) expr (* lam x.M *)
@@ -32,12 +33,12 @@ type expr =
   | Bool
   | True
   | False
-  (* if bb then tt else ff as typ, tt:typ, ff:typ *)
-  | If of expr * expr * expr * expr
+  (* if bb as x.typ then tt else ff, tt:typ[true/x], ff:typ[false/x] *)
+  | If of expr * (* BINDS *) expr * expr * expr
 
   | Id of expr * expr * expr (* Id(A, a, a') *)
   | Refl of expr (* Refl(a) : a=a *)
-  | J of expr * expr * expr (* J(path:a=a', a.a'.A.t, refl) *)
+  | J of expr * (* BINDS 3 *) expr * (* BINDS *) expr (* J(path:a=a', a.a'.A.t, refl) *)
 
   (* TODO: W types *)
   (* | W of string * expr * expr 
@@ -64,3 +65,34 @@ type expr =
 [@@deriving show]
 
 type typ = expr
+
+(** size is the length of env *)
+let rec levelize (size:int) (depth:int) (expr:expr) : expr = 
+  (* when BINDS, depth+=1 *)
+  match expr with
+  | Index i -> if i < depth then Index i else Level (size-(depth-i)-1)
+  | Level l -> Level l
+  | Type universe -> Type universe
+  | Let (e1, e2) -> Let(levelize size depth e1, levelize size (depth+1) e2)
+  | Pi (e1, e2) -> Pi(levelize size depth e1, levelize size (depth+1) e2)
+  | Lam e -> Lam (levelize size (depth+1) e)
+  | App (e1, e2) -> App(levelize size depth e1, levelize size depth e2)
+  | Sigma (e1, e2) -> Sigma(levelize size depth e1, levelize size (depth+1) e2)
+  | Pair (e1, e2) -> Pair (levelize size depth e1, levelize size depth e2)
+  | Fst e -> Fst (levelize size depth e)
+  | Snd e -> Snd (levelize size depth e)
+  | Void -> Void
+  | Exfalso (e1, e2) -> Exfalso (levelize size depth e1, levelize size depth e2)
+  | Unit -> Unit
+  | Trivial -> Trivial
+  | Singleton (e1, e2, e3) -> Singleton (levelize size depth e1, levelize size (depth+1) e2, levelize size depth e3)
+  | Bool -> Bool
+  | True -> True
+  | False -> False
+  | If (e1, e2, e3, e4) -> If (levelize size depth e1, levelize size (depth+1) e2, levelize size depth e3, levelize size depth e4)
+  | Id (e1, e2, e3) -> Id (levelize size depth e1, levelize size depth e2, levelize size depth e3)
+  | Refl e -> Refl (levelize size depth e)
+  | J (e1, e2, e3) -> J (levelize size depth e1, levelize size (depth+3) e2, levelize size (depth+1) e3)
+  | W (e1, e2) -> W (levelize size depth e1, levelize size (depth+1) e2)
+  | Tree (e1, e2) -> Tree (levelize size depth e1, levelize size (depth+1) e2)
+  | Ind (e1, e2, e3) -> Ind (levelize size depth e1, levelize size (depth+1) e2, levelize size (depth+3) e3)
