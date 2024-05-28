@@ -1,5 +1,6 @@
 (library
- (name mltt)
+ (name emltt)
  (preprocess (pps ppx_deriving.show))
  (modules syntax work)
+ (libraries simple mltt)
 )

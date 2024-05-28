@@ -1,4 +1,5 @@
 [@@@warning "-27"]
+[@@@warning "-11"]
 module ConcreteSyntax = struct
 
 end
