@@ -11,6 +11,22 @@ let plus : nat -> nat -> nat =
     | tree(a, s, h) => if a 
         then \ n . succ (h unit n)
         else \ n . n
+
+
+(* match V at x y p -> x.y.p.A with
+| refl x ->  x.W  *)
+
+let plus : nat -> nat -> nat = 
+    \ m . \ n . induct m at nat with
+    | tree(a, s, h) => if a with path 
+        then (* path:a=true |- *) 
+            let h' : Unit -> Nat = 
+                match path at x y p -> if y then Unit else Void with
+                | refl x -> h (* h : H(a) -> Nat *)
+                (* noooo, should be h : (a:A) -> H(a) -> Nat *)
+                (* also hard to elab, but explicit, no problem *)
+            in succ (h' unit)
+        else (* path:a=false |- *) n
 let one = succ zero
 let plus_one = plus one
 
