@@ -30,7 +30,7 @@ and value =
   | Force of value
   | Thunk of value
   | Return of value 
-  | Compose of value * value * clos * value
+  | Compose of value * value * value * clos 
   | CLam of clos
   | CPi of value * clos
   | Get of value 
@@ -97,12 +97,12 @@ let rec eval (env:env) (expr:S.expr) : value =
   | S.Thunk (comp) -> eval_thunk (eval env comp)
   | S.Get (loc) -> Get (eval env loc)
   | S.Put (loc, v) -> Put (eval env loc, eval env v)
-  | S.Compose (comp, typ, cont, ctyp) -> eval_compose (eval env comp) (eval env typ) (Clos{expr=cont; env}) (eval env ctyp)
+  | S.Compose (comp, typ, ctyp, cont) -> eval_compose (eval env comp) (eval env typ) (eval env ctyp) (Clos{expr=cont; env}) 
   | S.Return value -> Return (eval env value)
-and eval_compose (comp:value) (typ:value) (cont:clos) (ctyp:value) =
+and eval_compose (comp:value) (typ:value) (ctyp:value) (cont:clos)  =
   match comp with
   | Return value -> eval_clos cont value
-  | _ -> Compose (comp, typ, cont, ctyp)
+  | _ -> Compose (comp, typ, ctyp, cont)
 
 and eval_force (expr:value) =
   match expr with
@@ -220,13 +220,13 @@ let rec quote (size:int) (Normal{typ; value}:normal): S.expr =
     let normal = Normal {typ=eval_clos dst arg; value=eval_capp cfunc arg} in
     S.CLam (quote (size+1) normal)
   | Free(typ), Return(value) -> S.Return(quote size (Normal{typ; value}))
-  | _, Compose(comp, typ, cont, ctyp) -> 
+  | _, Compose(comp, typ, ctyp, cont) -> 
     let comp' = quote size (Normal{typ=Free typ; value=comp}) in
     let typ' = quote_typ size typ in
     let arg = mk_var typ size in
     let cont' = quote (size+1) (Normal{typ=ctyp; value=eval_clos cont arg}) in
     let ctyp' = quote_typ size ctyp in
-    S.Compose(comp', typ', cont', ctyp')
+    S.Compose(comp', typ', ctyp', cont')
   | _, Neutral {term=neutral; _} -> quote_ne size neutral
   | _ -> 
     print_endline ((show_value value) ^ " : " ^(show_value typ));
@@ -254,7 +254,7 @@ and quote_typ (size:int) (typ:value) : S.expr =
     let var = mk_var src size in
     S.CPi(quote_typ size src, quote_typ (size+1) (eval_clos dst var))
   | Neutral {term; _} -> quote_ne size term
-  | _ -> failwith "quote_typ not_a_type"
+  | typ -> failwith ("quote_typ not_a_type" ^ (show_value typ))
 and quote_ne (size:int) (neutral:neutral) : S.expr =
   match neutral with
   | Level level -> S.Index (size-(level+1)) (* index = size-(level+1) *)

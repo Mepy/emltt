@@ -39,7 +39,7 @@ type expr =
   | Free of typ (* F uC *)
   | Force of expr (* force(V) *)
   | Return of expr (* return V *)
-  | Compose of comp * typ * (* BINDS *) comp * ctyp (* Compose(M, A, x.N, uC) *)
+  | Compose of comp * typ * ctyp * (* BINDS *) comp  (* Compose(M, A, uC, x.N) *)
   (* return V to x:A. M = M[V/x] *)
   | CPi of typ * (* BINDS *) comp (* Pi(A, x.M) *)
   | CLam of (* BINDS *) comp (* CLam(A, x.M) *)

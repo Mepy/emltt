@@ -1,5 +1,6 @@
 module S = Emltt.Syntax
 module N = Emltt.Nbe
+open Emltt.Example
 
 (* let thunk_force : (uC:U<0>) -> (k:U uC) -> U uC =
    fun uC k -> thunk force k *)
@@ -25,7 +26,7 @@ let thunk_get_typ = S.CPi(S.Bool, S.Underline(S.Free(S.Bool)))
 
 (* let compose_return : F Bool = 
    return false to x:Bool. get(x) *)
-let compose_return = S.Compose(S.Return(S.False), S.Bool, S.Get(S.Index(0)), S.Free(S.Bool))
+let compose_return = S.Compose(S.Return(S.False), S.Bool, S.Free(S.Bool), S.Get(S.Index(0)))
 let compose_return_typ = S.Free(S.Bool)
 
 (* let return_v : Bool -> F Bool =
@@ -35,6 +36,6 @@ let return_v_typ = S.CPi(S.Bool, S.Free(S.Bool))
 
 (* let compose_force : F Bool -> =
    fun y -> y to x:Bool. get(x) *)
-let compose_force = S.Lam(S.Compose(S.Index(0), S.Bool, S.Get(S.Index(0)), S.Free(S.Bool)))
+let compose_force = S.Lam(S.Compose(S.Index(0), S.Bool, S.Free(S.Bool), S.Get(S.Index(0))))
 let compose_force_typ = S.Pi(S.Free(S.Bool), S.Free(Bool))
 
