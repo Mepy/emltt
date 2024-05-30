@@ -2,7 +2,6 @@
 
 module S = Syntax
 
-module Nbe = struct
 
 type env = value list
 and clos = | Clos of {expr:S.expr; env:env}
@@ -28,11 +27,15 @@ and value =
   | Underline of value
   | Free of value
 
+  | Force of value
+  | Thunk of value
   | Return of value 
+  | Compose of value * value * clos * value
   | CLam of clos
   | CPi of value * clos
   | Get of value 
-  | Put of value
+  | Put of value * value
+  
 and neutral = 
   | Level of int (* DeBruijn level *)
   | App of neutral * normal
@@ -43,9 +46,7 @@ and neutral =
   | If of neutral * value * value * value
   | J of neutral * clos3 * clos * value * value * value
 
-  | Thunk of neutral
-  | Force of neutral
-  | Compose of neutral * value * clos 
+  
   | CApp of neutral * normal
   
 and normal = | Normal of {typ:value; value:value}
@@ -53,7 +54,7 @@ and normal = | Normal of {typ:value; value:value}
 
 let mk_var typ level = Neutral {typ; term=Level level}
 
-module S = Syntax
+
 let rec eval (env:env) (expr:S.expr) : value = 
   match expr with
   | S.Index i -> List.nth env i
@@ -86,8 +87,42 @@ let rec eval (env:env) (expr:S.expr) : value =
   | S.Refl expr -> Refl (eval env expr)
   | S.J (path, mot, refl) ->
     eval_j (Clos3 {expr=mot; env}) (Clos {expr=refl; env}) (eval env path)
+
+  | S.CPi (src, dst) -> CPi (eval env src, Clos {expr=dst; env})
+  | S.CLam (body) -> CLam (Clos {expr=body; env})
+  | S.CApp (comp, expr) -> eval_capp (eval env comp) (eval env expr)
+  | S.Free (typ) -> Free (eval env typ)
   | S.Underline (typ) -> Underline(eval env typ)
-  | S.Thunk (comp) -> failwith "todo with nf/ne of thunk/force"
+  | S.Force (expr) -> eval_force (eval env expr)
+  | S.Thunk (comp) -> eval_thunk (eval env comp)
+  | S.Get (loc) -> Get (eval env loc)
+  | S.Put (loc, v) -> Put (eval env loc, eval env v)
+  | S.Compose (comp, typ, cont, ctyp) -> eval_compose (eval env comp) (eval env typ) (Clos{expr=cont; env}) (eval env ctyp)
+  | S.Return value -> Return (eval env value)
+and eval_compose (comp:value) (typ:value) (cont:clos) (ctyp:value) =
+  match comp with
+  | Return value -> eval_clos cont value
+  | _ -> Compose (comp, typ, cont, ctyp)
+
+and eval_force (expr:value) =
+  match expr with
+  | Thunk comp -> comp (* force thunk M = M *)
+  | _ -> Force expr
+and eval_thunk (comp:value) =
+  match comp with
+  | Force value -> value (* thunk force V = V *)
+  | _ -> Thunk comp
+and eval_capp (func:value) (arg:value) =
+  match func with
+  | CLam clos -> eval_clos clos arg
+  | Neutral {typ; term} -> (
+    match typ with
+    | CPi (src, dst) -> 
+      let dst = eval_clos dst arg in
+      Neutral {typ=dst; term=App(term, Normal {typ=src; value=arg})}
+    | _ -> failwith "app not_a_cpi_type_func _"
+  )
+  | _ -> failwith "app not_a_compfunc _"
 and eval_app (func:value) (arg:value) =
   match func with
   | Lam clos -> eval_clos clos arg
@@ -175,6 +210,23 @@ let rec quote (size:int) (Normal{typ; value}:normal): S.expr =
   | _, True -> S.True
   | _, False -> S.False
   | Id(a_typ, _, _), Refl(a) -> S.Refl(quote size (Normal{typ=a_typ; value=a}))
+  | uC, Force (value) -> S.Force (quote size (Normal{typ=Underline(uC); value}))
+  | Underline(uC), Thunk (value) -> S.Thunk (quote size (Normal{typ=uC; value}))
+  | typ, Thunk (value) -> S.Thunk (quote size (Normal{typ=Free(typ); value}))
+  | _, Get (loc) -> S.Get(quote size (Normal{typ=Bool; value=loc}))
+  | _, Put (loc, v) -> S.Put(quote size (Normal{typ=Bool; value=loc}), quote size (Normal{typ=Bool; value=v}))
+  | CPi(src, dst), cfunc -> 
+    let arg = mk_var src size in
+    let normal = Normal {typ=eval_clos dst arg; value=eval_capp cfunc arg} in
+    S.CLam (quote (size+1) normal)
+  | Free(typ), Return(value) -> S.Return(quote size (Normal{typ; value}))
+  | _, Compose(comp, typ, cont, ctyp) -> 
+    let comp' = quote size (Normal{typ=Free typ; value=comp}) in
+    let typ' = quote_typ size typ in
+    let arg = mk_var typ size in
+    let cont' = quote (size+1) (Normal{typ=ctyp; value=eval_clos cont arg}) in
+    let ctyp' = quote_typ size ctyp in
+    S.Compose(comp', typ', cont', ctyp')
   | _, Neutral {term=neutral; _} -> quote_ne size neutral
   | _ -> 
     print_endline ((show_value value) ^ " : " ^(show_value typ));
@@ -196,6 +248,11 @@ and quote_typ (size:int) (typ:value) : S.expr =
     S.Id( quote_typ size typ
         , quote size (Normal{typ; value=left})
         , quote size (Normal{typ; value=right}) )
+  | Underline (typ) -> S.Underline(quote_typ size typ)
+  | Free (typ) -> S.Free(quote_typ size typ)
+  | CPi (src, dst) -> 
+    let var = mk_var src size in
+    S.CPi(quote_typ size src, quote_typ (size+1) (eval_clos dst var))
   | Neutral {term; _} -> quote_ne size term
   | _ -> failwith "quote_typ not_a_type"
 and quote_ne (size:int) (neutral:neutral) : S.expr =
@@ -227,7 +284,7 @@ and quote_ne (size:int) (neutral:neutral) : S.expr =
       (Normal { typ=eval_clos3 mot refl_var refl_var (Refl refl_var)
               ; value=eval_clos refl refl_var}) in
     S.J (path', mot', refl')
-  | _ -> failwith "todo"
+  | CApp(neutral, arg) -> S.App (quote_ne size neutral, quote size arg)
 
 let rec initial_env (env:S.typ list) : env * int =
   match env with
@@ -243,4 +300,3 @@ let normalize (env:S.typ list) (expr:S.expr) (typ:S.typ) : S.expr =
   let value = eval env' expr in
   let normal = Normal {typ; value} in
   quote size normal
-end
