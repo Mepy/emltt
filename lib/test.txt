@@ -1,13 +1,25 @@
 let Loc : U<0> = Bool
 let Val : U<0> = Bool
 
+(* 
 let subst : (A : Bool -> U<0>) (m : Bool) (n : Bool) -> (Id Bool m n) -> (A m) -> (A n) =
   fun A m n path ->
   match path at x y p -> (A x) -> (A y) with
   | refl _ -> fun x -> x
+*)
+  
+let subst : (A : U<0>) (B: A->U<0>) (a1 : A) (a2 : A) -> Id(A, a1, a2) -> (B a1) -> (B a2) =
+  fun A B a1 a2 path ->
+  match path at x y p -> (B x) -> (B y) with
+  | refl _ -> fun x -> x
 
 let discrimination : Id (Bool, tt, ff) -> Void =
-    let large_elim : Bool -> U<0> = 
-        fun x -> if x then Id(Bool, tt, tt) else Void end 
-        (* Id(Bool, tt, tt) : U<0>, Void : U<0> *)
-    in fun path -> subst large_elim tt ff refl(tt)
+  let large_elim : Bool -> U<0> = 
+      fun x -> if x then Id(Bool, tt, tt) else Void end 
+      (* Id(Bool, tt, tt) : U<0>, Void : U<0> *)
+  in fun path -> subst Bool large_elim tt ff refl(tt)
+
+let rewrite : (A : U<0>) -> (B : U<0>) -> (F : A -> B) ->
+  (a1 : A) -> (a2 : A) -> Id(A, a1, a2) -> Id(B, F a1, F a2) =
+  fun A B F a1 a2 path ->
+  subst A (fun a -> Id(B, F a1, F a)) a1 a2 path refl(F a1)
