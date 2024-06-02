@@ -2,13 +2,22 @@ open Syntax
 let loc_typ = Bool
 let val_typ = Bool
 
-(* axioms : 
 
+let ap f a = App(f, a)
+let ap2 f a1 a2 = App(App(f, a1), a2)
+
+let ap3 f a1 a2 a3 = App(App(App(f, a1), a2), a3)
+let ap4 f a1 a2 a3 a4 = App(App(App(App(f, a1), a2), a3), a4)
+let ap5 f a1 a2 a3 a4 a5 = App(App(App(App(App(f, a1), a2), a3), a4), a5)
+let ap6 f a1 a2 a3 a4 a5 a6 = App(App(App(App(App(App(f, a1), a2), a3), a4), a5), a6)
+let ap7 f a1 a2 a3 a4 a5 a6 a7 = App(App(App(App(App(App(App(f, a1), a2), a3), a4), a5), a6), a7)
+
+module Axioms = struct
+(* 
 a0 : (uC:U<0>) -> (k:Unit->U uC) -> (l:Loc) ->
 Id(U uC, thunk (get(l) to x:Val.put(l, x) to _. force (k unit)), k unit)
 
 *)
-module Axioms = struct
 let a0_typ = Pi((* uC: *)Type(0), 
   Pi((* k : *) Pi((* _ : *)Unit, Underline(Index(1))), 
   Pi((* l : *) loc_typ, 
@@ -20,6 +29,7 @@ let a0_typ = Pi((* uC: *)Type(0),
     (App(Index(1), Trivial)) (* k unit *)
     )
   )))
+let a0 uC k l = ap3 (Level 0) uC k l
 (* 
 
 a1 : (uC:U<0>) -> (k:Val->U uC) -> (l:Loc) -> (v:Val) ->
@@ -44,7 +54,7 @@ let a1_typ = Pi((* uC: *)Type(0),
     )
     )
   ))))
-
+let a1 uC k l v = ap4 (Level 1) uC k l v
 (*
 a2 : (uC:U<0>) -> (k:Unit->U uC) -> (l:Loc) -> (v1:Val) -> (v2:Val) ->
 Id(U uC, 
@@ -71,6 +81,7 @@ let a2_typ = Pi((* uC: *)Type(0),
     )
     )
   )))))
+let a2 uC k l v1 v2 = ap5 (Level 2) uC k l v1 v2
 (* 
 
 a3 : (uC:U<0>) -> (k:Val->Val->U uC) -> (l1:Loc) -> (l2:Loc) ->
@@ -97,6 +108,32 @@ let a3_typ = Pi((* uC: *)Type(0),
         Force(App(App(Index(4), Index(0)), Index(1)))
       ))
     )
+    )
+  ))))
+let a3 uC k l1 l2 = ap4 (Level 3) uC k l1 l2
+let a3_left = 
+  Pi((* uC: *) Type(0), 
+  Pi((* k : *) Pi((* _ : *)val_typ, Pi((* _ : *) val_typ, Underline(Index(2)))), 
+  Pi((* l1 : *) loc_typ, 
+  Pi((* l2 : *) val_typ,
+    Thunk(
+      Compose(Get(Index(1)), val_typ, Index(3), (* v1:Val *) 
+      Compose(Get(Index(1)), val_typ, Index(4), (* v2:Val *)
+        Force(App(App(Index(4), Index(1)), Index(0)))
+      ))
+    )
+  ))))
+
+let a3_right = 
+  Pi((* uC: *) Type(0), 
+  Pi((* k : *) Pi((* _ : *)val_typ, Pi((* _ : *) val_typ, Underline(Index(2)))), 
+  Pi((* l1 : *) loc_typ, 
+  Pi((* l2 : *) val_typ,
+    Thunk(
+      Compose(Get(Index(0)), val_typ, Index(3), (* v2:Val *) 
+      Compose(Get(Index(2)), val_typ, Index(4), (* v1:Val *)
+        Force(App(App(Index(4), Index(0)), Index(1)))
+      ))
     )
   ))))
 
@@ -131,6 +168,8 @@ let a4_typ = Pi((* uC: *)Type(0),
     )
   )))))))
 
+let a4 uC k l1 l2 v1 v2 dis = ap7 (Level 4) uC k l1 l2 v1 v2 dis
+
 end
 
 module Base = struct 
@@ -159,11 +198,18 @@ let subst = Lam((* A *) Lam((* B *)
   )
   ))))))
 
+let subst5 a_typ b_typ a1 a2 path = 
+    App(App(App(App(App(subst, a_typ), b_typ), a1), a2), path)
+  
 let subst6 a_typ b_typ a1 a2 path b1 = 
   App(App(App(App(App(App(subst, a_typ), b_typ), a1), a2), path), b1)
-let subst5 a_typ b_typ a1 a2 path = 
-  App(App(App(App(App(subst, a_typ), b_typ), a1), a2), path)
 
+(* 
+let rewrite : (A : U<0>) -> (B : U<0>) -> (F : A -> B) ->
+  (a1 : A) -> (a2 : A) -> Id(A, a1, a2) -> Id(B, F a1, F a2) =
+  fun A B F a1 a2 path ->
+  subst A (fun a -> Id(B, F a1, F a)) a1 a2 path refl(F a1)  
+*)
 let rewrite_typ =   
   Pi((* A : *) Type 0, 
   Pi((* B : *) Type 0,
@@ -241,8 +287,13 @@ let tran = Lam((* A *) Lam((* a1 *) Lam((* a2 *) Lam((* a3*) Lam((* p12 *)
     (symm4 (Index 4) (Index 3) (Index 2) (Index 0))
   )))))
 
+let tran6 a_typ a1 a2 a3 p12 p23 = App(App(App(App(App(App(tran, a_typ), a1), a2), a3), p12), p23)
+
+
 end
 
+
+module Swap = struct 
 
 (* 
 let swap : (uC : U<0>) -> (k:U uC) -> uC =
@@ -284,6 +335,189 @@ let example_typ = Pi((* uC : *)Type(0), Pi((* k : *) Underline(Index(0)),
   )
 ))
 
+(* to prove example, we assume (uC:U<0>) -> (k:U uC) -> *)
+let uC = Index 1
+let uuC = Underline uC
+let k = Index 0
+
+let tm0 = Thunk(
+  Compose (Get True , val_typ, Index 1,  (* x : Val *)
+  Compose (Get False, val_typ, Index 2,  (* y : Val *)
+  Compose (Put (True , Index 0 (* y *)), Unit, Index 3, (* _ : Val *)
+  Compose (Put (False, Index 2 (* x *)), Unit, Index 4, (* _ : Val *)
+  Compose (Get True , val_typ, Index 5, (* x' : Val *)
+  Compose (Get False, val_typ, Index 6, (* y' : Val *)
+  Compose (Put (True , Index 0 (* y' *)), Unit, Index 7, (* _ : Val *)
+  Compose (Put (False, Index 2 (* x' *)), Unit, Index 8, (* _ : Val *)
+    Force (Index 8)
+  )))))))))
+  (* Axioms.a3 *)
+
+let step0 = (* uC:U<0>. k:U uC. *)
+( let h = Base.rewrite6 uuC uuC (Lam (* k : U uC *) (Thunk(
+  Compose (Get True , val_typ, Index 2,  (* x : Val *)
+  Compose (Get False, val_typ, Index 3,  (* y : Val *)
+  Compose (Put (True , Index 0), Unit, Index 4, (* _ : Val *)
+  Compose (Put (False, Index 2), Unit, Index 5, (* _ : Val *)
+  Force (Index 4)
+  ))))))) in
+  let k (* : Val -> Val -> U uC *) = Lam (* v1 *) (Lam (* v2 *) (Thunk (
+  Compose (Put (True , Index 0), Unit, Index 3, (* _ : Val *)
+  Compose (Put (False, Index 2), Unit, Index 4, (* _ : Val *)
+    Force (Index 4)
+  ))))) in
+  h
+  (ap4 Axioms.a3_left uC k True False) 
+  (ap4 Axioms.a3_right uC k True False)
+  (Axioms.a3 uC k True False)
+)
+
+let tm1 = Thunk(
+  Compose (Get True , val_typ, Index 1,  (* x : Val *)
+  Compose (Get False, val_typ, Index 2,  (* y : Val *)
+  Compose (Put (True , Index 0 (* y *)), Unit, Index 3, (* _ : Val *)
+  Compose (Put (False, Index 2 (* x *)), Unit, Index 4, (* _ : Val *)
+  Compose (Get False, val_typ, Index 5, (* y' : Val *)
+  Compose (Get True , val_typ, Index 6, (* x' : Val *)
+  Compose (Put (True , Index 1 (* y' *)), Unit, Index 7, (* _ : Val *)
+  Compose (Put (False, Index 1 (* x' *)), Unit, Index 8, (* _ : Val *)
+    Force (Index 8)
+  )))))))))
+
+  (* Axioms.a1 *)
+(* todo a1 *)
+let step1 = (* uC:U<0>. k:U uC. *)
+  ( let h = Base.rewrite6 uuC uuC (Lam (* k : U uC *) (Thunk (
+      Compose (Get True , val_typ, Index 2,  (* x : Val *)
+      Compose (Get False, val_typ, Index 3,  (* y : Val *)
+      Compose (Put (True , Index 0 (* y *)), Unit, Index 4, (* _ : Val *)
+      Force (Index 3)
+    )))))) in
+    let k (* : Val -> U uC *) = Lam (* v *) (Thunk (
+    Compose (Get True , val_typ, Index 2, (* x' : Val *)
+    Compose (Put (True , Index 1 (* y'=v *)), Unit, Index 3, (* _ : Val *)
+    Compose (Put (False, Index 1 (* x' *)), Unit, Index 4, (* _ : Val *)
+      Force (Index 4)
+    ))))) in
+    h
+    (ap4 Axioms.a3_left uC k False) 
+    (ap4 Axioms.a3_right uC k False)
+    (Axioms.a1 uC k False (Index 2))
+  )
+let tm2 = Thunk(
+  Compose (Get True , val_typ, Index 1,  (* x : Val *)
+  Compose (Get False, val_typ, Index 2,  (* y : Val *)
+  Compose (Put (True , Index 0 (* y *)), Unit, Index 3, (* _ : Val *)
+  Compose (Put (False, Index 2 (* x *)), Unit, Index 4, (* _ : Val *)
+  Compose (Get True , val_typ, Index 5, (* x' : Val *)
+  Compose (Put (True , Index 4 (* y'=x *)), Unit, Index 6, (* _ : Val *)
+  Compose (Put (False, Index 1 (* x' *)), Unit, Index 7, (* _ : Val *)
+    Force (Index 7)
+  ))))))))
+
+  (* Axioms.a4 *)
+let step2 = Unit (* todo : uC:U<0>. k:U uC. *)
+let tm3 = Thunk(
+  Compose (Get True , val_typ, Index 1,  (* x : Val *)
+  Compose (Get False, val_typ, Index 2,  (* y : Val *)
+  Compose (Put (False, Index 1 (* x *)), Unit, Index 3, (* _ : Val *)
+  Compose (Put (True , Index 1 (* y *)), Unit, Index 4, (* _ : Val *)
+  Compose (Get True , val_typ, Index 5, (* x' : Val *)
+  Compose (Put (True , Index 4 (* y'=x *)), Unit, Index 6, (* _ : Val *)
+  Compose (Put (False, Index 1 (* x' *)), Unit, Index 7, (* _ : Val *)
+    Force (Index 7)
+  ))))))))
+
+  (* Axioms.a1 *)
+let step3 = Unit (* todo : uC:U<0>. k:U uC. *)
+let tm4 = Thunk(
+  Compose (Get True , val_typ, Index 1,  (* x : Val *)
+  Compose (Get False, val_typ, Index 2,  (* y : Val *)
+  Compose (Put (False, Index 1 (* x *)), Unit, Index 3, (* _ : Val *)
+  Compose (Put (True , Index 1 (* y *)), Unit, Index 4, (* _ : Val *)
+  Compose (Put (True , Index 3 (* y'=x *)), Unit, Index 5, (* _ : Val *)
+  Compose (Put (False, Index 3 (* x'=y *)), Unit, Index 6, (* _ : Val *)
+    Force (Index 6)
+  )))))))
+
+  (* Axioms.a2 *)
+let step4 = Unit (* todo : uC:U<0>. k:U uC. *)
+let tm5 = Thunk(
+  Compose (Get True , val_typ, Index 1,  (* x : Val *)
+  Compose (Get False, val_typ, Index 2,  (* y : Val *)
+  Compose (Put (False, Index 1 (* x *)), Unit, Index 3, (* _ : Val *)
+  Compose (Put (True , Index 2 (* y'=x *)), Unit, Index 4, (* _ : Val *)
+  Compose (Put (False, Index 2 (* x'=y *)), Unit, Index 5, (* _ : Val *)
+    Force (Index 5)
+  ))))))
+
+(* Axioms.a4 *)
+let step5 = Unit (* todo : uC:U<0>. k:U uC. *)
+let tm6 = Thunk(
+  Compose (Get True , val_typ, Index 1,  (* x : Val *)
+  Compose (Get False, val_typ, Index 2,  (* y : Val *)
+  Compose (Put (False, Index 1 (* x *)), Unit, Index 3, (* _ : Val *)
+  Compose (Put (False, Index 1 (* x'=y *)), Unit, Index 4, (* _ : Val *)
+  Compose (Put (True , Index 3 (* y'=x *)), Unit, Index 5, (* _ : Val *)
+    Force (Index 5)
+  ))))))
+
+(* Axioms.a2 *)
+
+let step6 = Unit (* todo : uC:U<0>. k:U uC. *)
+let tm7 = Thunk(
+  Compose (Get True , val_typ, Index 1,  (* x : Val *)
+  Compose (Get False, val_typ, Index 2,  (* y : Val *)
+  Compose (Put (False, Index 0 (* x'=y *)), Unit, Index 3, (* _ : Val *)
+  Compose (Put (True , Index 2 (* y'=x *)), Unit, Index 4, (* _ : Val *)
+    Force (Index 4)
+  )))))
+
+(* Axioms.a0 *)
+  (* a0 : (uC:U<0>) -> (k:Unit->U uC) -> (l:Loc) ->
+  Id(U uC, thunk (get(l) to x:Val.put(l, x) to _. force (k unit)), k unit)
+   *)
+let step7 = (* uC:U<0>. k:U uC. *)
+( let h = Base.rewrite6 uuC uuC (Lam (* k : U uC *) (Thunk(
+  Compose (Get True , val_typ, Index 1,  (* x : Val *)
+  Force (Index 1)
+  )))) in
+  let k (* : Val -> Val -> U uC *) = Lam (* v1 *) (Lam (* v2 *) (Thunk (
+  Compose (Put (True , Index 0), Unit, Index 3, (* _ : Val *)
+  Compose (Put (False, Index 2), Unit, Index 4, (* _ : Val *)
+    Force (Index 4)
+  ))))) in
+  h
+  (ap4 Axioms.a3_left uC k True False) 
+  (ap4 Axioms.a3_right uC k True False)
+  (Axioms.a0 uC (Lam (* _ : Unit *) Unit(*todo*)) False)
+)
+
+ 
+
+let tm8 = Thunk(
+  Compose (Get True , val_typ, Index 1,  (* x : Val *)
+  Compose (Put (True , Index 2 (* y'=x *)), Unit, Index 2, (* _ : Val *)
+    Force (Index 2)
+  )))
+
+
+(* Axioms.a0 *)
+let step8 = (* uC:U<0>. k:U uC. *)
+    Axioms.a0 uC (Lam (* _ : Unit *) (Index 1)) True
+
+let tm9 = (Index 0)
+
 let example = Lam((* uC *)Lam((* k *)
-    Trivial (* todo *)
+  (Base.tran6 uuC tm0 tm1 tm9 step0 
+  (Base.tran6 uuC tm1 tm2 tm9 step1
+  (Base.tran6 uuC tm2 tm3 tm9 step2
+  (Base.tran6 uuC tm3 tm4 tm9 step3
+  (Base.tran6 uuC tm4 tm5 tm9 step4
+  (Base.tran6 uuC tm5 tm6 tm9 step5 
+  (Base.tran6 uuC tm6 tm7 tm9 step6 
+  (Base.tran6 uuC tm7 tm8 tm9 step7 step8
+  ))))))))
 ))
+
+end
