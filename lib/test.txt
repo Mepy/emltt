@@ -8,7 +8,8 @@ let subst : (A : Bool -> U<0>) (m : Bool) (n : Bool) -> (Id Bool m n) -> (A m) -
   | refl _ -> fun x -> x
 *)
   
-let subst : (A : U<0>) (B: A->U<0>) (a1 : A) (a2 : A) -> Id(A, a1, a2) -> (B a1) -> (B a2) =
+let subst : (A : U<0>) (B: A->U<0>) (a1 : A) (a2 : A) -> 
+  Id(A, a1, a2) -> (B a1) -> (B a2) =
   fun A B a1 a2 path ->
   match path at x y p -> (B x) -> (B y) with
   | refl _ -> fun x -> x
@@ -23,3 +24,14 @@ let rewrite : (A : U<0>) -> (B : U<0>) -> (F : A -> B) ->
   (a1 : A) -> (a2 : A) -> Id(A, a1, a2) -> Id(B, F a1, F a2) =
   fun A B F a1 a2 path ->
   subst A (fun a -> Id(B, F a1, F a)) a1 a2 path refl(F a1)
+
+let symm : (A : U<0>) (a1:A) (a2:A) ->
+  Id(A, a1, a2) -> Id(A, a2, a1) =
+  fun A a1 a2 path ->
+  subst A (fun a -> Id(A, a, a1)) a1 a2 path refl(a1)
+
+let tran : (A : U<0>) (a1:A) (a2:A) (a3:A) -> 
+  Id(A, a1, a2) -> Id(A, a2, a3) -> Id(A, a1, a3) =
+  fun A a1 a2 a3 path ->
+  let path' : Id(A, a2, a1) = symm A a1 a2 path in
+  subst A (fun a -> Id(A, a, a3)) a1 a2 path'

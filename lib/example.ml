@@ -159,8 +159,11 @@ let subst = Lam((* A *) Lam((* B *)
   )
   ))))))
 
-let subst_help a_typ b_typ a1 a2 path b1 = 
+let subst6 a_typ b_typ a1 a2 path b1 = 
   App(App(App(App(App(App(subst, a_typ), b_typ), a1), a2), path), b1)
+let subst5 a_typ b_typ a1 a2 path = 
+  App(App(App(App(App(subst, a_typ), b_typ), a1), a2), path)
+
 let rewrite_typ =   
   Pi((* A : *) Type 0, 
   Pi((* B : *) Type 0,
@@ -182,13 +185,61 @@ let rewrite = Lam((* A *) Lam((* B *) Lam ((* F *)
     Refl(App(Index(3), Index(2)))
   )
   *)
-  subst_help (Index 5) 
+  subst6 (Index 5) 
     (Lam((* a *) Id(Index(5), App(Index(4), Index(3)), App(Index(4), Index(0)))))
     (Index 2) (Index 1) (Index 0) (Refl(App(Index 3, Index 2)))
   ))))))
 
-let rewrite_helper a_typ b_typ f a1 a2 p =
+let rewrite6 a_typ b_typ f a1 a2 p =
   App(App(App(App(App(App(rewrite, a_typ), b_typ), f), a1), a2), p)
+
+(*
+let symm : (A : U<0>) (a1:A) (a2:A) ->
+  Id(A, a1, a2) -> Id(A, a2, a1) =
+  fun A a1 a2 path ->
+  subst A (fun a -> Id(A, a, a1)) a1 a2 path refl(a1)
+   
+*)
+let symm_typ = 
+  Pi((* A : *) Type 0, 
+  Pi((* a1 : A*) Index(0),
+  Pi((* a2 : A*) Index(1),
+  Pi((* path : *) Id(Index(2), Index(1), Index(0)),
+    Id(Index(3), Index(1), Index(2))
+  ))))
+
+let symm = Lam((* A *) Lam((* a1 *) Lam((* a2 *) Lam((* path *)
+  subst6 (Index 3) 
+    (Lam (* a *)(Id(Index 4, Index 0, Index 3)))
+    (Index 2) (Index 1) (Index 0) (Refl (Index 2))
+  ))))
+
+let symm4 a_typ a1 a2 path = App(App(App(App(symm, a_typ), a1), a2), path)
+
+(* 
+let tran : (A : U<0>) (a1:A) (a2:A) (a3:A) -> 
+  Id(A, a1, a2) -> Id(A, a2, a3) -> Id(A, a1, a3) =
+  fun A a1 a2 a3 path ->
+  let path' : Id(A, a2, a1) = symm A a1 a2 path in
+  subst A (fun a -> Id(A, a, a3)) a1 a2 path'
+*)
+let tran_typ = 
+  Pi((* A : *) Type 0, 
+  Pi((* a1 : A*) Index(0),
+  Pi((* a2 : A*) Index(1),
+  Pi((* a3 : A*) Index(1),
+  Pi((* p12 : *) Id(Index(3), Index(2), Index(1)),
+  Pi((* p23 : *) Id(Index(4), Index(2), Index(1)),
+    Id(Index(5), Index(4), Index(2))
+  ))))))
+  
+
+let tran = Lam((* A *) Lam((* a1 *) Lam((* a2 *) Lam((* a3*) Lam((* p12 *)
+  subst5 (Index 4) 
+    (Lam (* a *) (Id(Index 5, Index 0, Index 2)))
+    (Index 3) (Index 2)
+    (symm4 (Index 4) (Index 3) (Index 2) (Index 0))
+  )))))
 
 end
 
