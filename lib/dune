@@ -1,6 +1,6 @@
 (library
  (name emltt)
  (preprocess (pps ppx_deriving.show))
- (modules syntax nbe example)
+ (modules syntax nbe tyck example)
  (libraries simple mltt)
 )

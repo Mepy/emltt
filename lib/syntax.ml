@@ -1,9 +1,9 @@
 (* we do namelessly *)
-type expr = 
+type expr =
   | Index of int (* DeBruijn index *)
   | Level of int (* DeBruijn level, NOT use when construct AST *)
   | Type of int (* universe i *)
-  | Let of expr * (* BINDS *) expr (* let _0 = expr in expr *)
+  | Let of expr * typ * (* BINDS *) expr (* let _0 : typ = expr in expr *)
 
   | Pi of typ * (* BINDS *) typ (* Pi A x.B *)
   | Lam of (* BINDS *) expr (* lam A, x.V *)
@@ -33,7 +33,7 @@ type expr =
   | Refl of expr (* Refl(a) : a=a *)
   | J of expr * (* BINDS 3 *) expr * (* BINDS *) expr (* J(path:a=a', a.a'.A.t, x.refl) *)
 
-  | Underline of typ (* U A, underline set/forgetful function U *)
+  | Underline of ctyp (* U uC, underline set/forgetful function U *)
   | Thunk of comp (* thunk M *)
   (* computation as followed: *)
   | Free of typ (* F uC *)
@@ -55,13 +55,13 @@ and ctyp = comp (* comp type *)
 
 (** todo: maybe, we need No levelize if we have no W-induction, just remain here *)
 (** size is the length of env *)
-let rec levelize (size:int) (depth:int) (expr:expr) : expr = 
+let rec levelize (size:int) (depth:int) (expr:expr) : expr =
   (* when BINDS, depth+=1 *)
   match expr with
   | Index i -> if i < depth then Index i else Level (size-(depth-i)-1)
   | Level l -> Level l
   | Type universe -> Type universe
-  | Let (e1, e2) -> Let(levelize size depth e1, levelize size (depth+1) e2)
+  | Let (e1, t, e2) -> Let(levelize size depth e1, levelize size depth t, levelize size (depth+1) e2)
   | Pi (e1, e2) -> Pi(levelize size depth e1, levelize size (depth+1) e2)
   | Lam e -> Lam (levelize size (depth+1) e)
   | App (e1, e2) -> App(levelize size depth e1, levelize size depth e2)
